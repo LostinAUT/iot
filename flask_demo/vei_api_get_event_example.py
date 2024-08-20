@@ -29,8 +29,8 @@ Host = "open.volcengineapi.com"
 ContentType = "application/json"
 
 # 请求的凭证，从IAM或者STS服务中获取
-# AK = "AKLTOThkN2ZjNWQyNWZhNGU5NjhmN2RiYWQzYWI2NTY1ZDc"
-# SK = "TWpFeU1HWTFObVkzTWpsbE5HRXdNbUl5WWpjM01HSXhNbVJsWVRnNE1EYw=="
+AK = "AKLTOThkN2ZjNWQyNWZhNGU5NjhmN2RiYWQzYWI2NTY1ZDc"
+SK = "TWpFeU1HWTFObVkzTWpsbE5HRXdNbUl5WWpjM01HSXhNbVJsWVRnNE1EYw=="
 # 当使用临时凭证时，需要使用到SessionToken传入Header，并计算进SignedHeader中，请自行在header参数中添加X-Security-Token头
 # SessionToken = ""
 

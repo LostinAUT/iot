@@ -1,4 +1,8 @@
-from flask import Flask, render_template, jsonify
+import eventlet
+eventlet.monkey_patch()
+from flask_socketio import SocketIO
+from flask import Flask, render_template, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
 import datetime
 import hashlib
 import hmac
@@ -8,8 +12,40 @@ import json
 import logging
 import re
 import subprocess
+import base64
+import uuid
+import time
+from asr import test_one
+
 
 app = Flask(__name__)
+socketio = SocketIO(app)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///health_data.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+
+db = SQLAlchemy(app)
+
+
+class HealthData(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
+    heart_rate = db.Column(db.Integer)
+    spo2 = db.Column(db.Integer)
+    temperature = db.Column(db.Float)
+    humidity = db.Column(db.Float)
+
+    def __init__(self, heart_rate, spo2, temperature, humidity):
+        self.heart_rate = heart_rate
+        self.spo2 = spo2
+        self.temperature = temperature
+        self.humidity = humidity
+
+
+# 创建数据库和表
+with app.app_context():
+    db.create_all()
+
 
 try:
     import http.client as http_client
@@ -32,13 +68,15 @@ Host = "open.volcengineapi.com"
 ContentType = "application/json"
 
 # 请求的凭证，从IAM或者STS服务中获取
-# AK = "AKLTOThkN2ZjNWQyNWZhNGU5NjhmN2RiYWQzYWI2NTY1ZDc"
-# SK = "TWpFeU1HWTFObVkzTWpsbE5HRXdNbUl5WWpjM01HSXhNbVJsWVRnNE1EYw=="
+AK = "AKLTOThkN2ZjNWQyNWZhNGU5NjhmN2RiYWQzYWI2NTY1ZDc"
+SK = "TWpFeU1HWTFObVkzTWpsbE5HRXdNbUl5WWpjM01HSXhNbVJsWVRnNE1EYw=="
 # 当使用临时凭证时，需要使用到SessionToken传入Header，并计算进SignedHeader中，请自行在header参数中添加X-Security-Token头
 # SessionToken = ""
 
-personal_access_token = "pat_O7P0vcg1Bw1Zb0MpPyYbleeInHnmgoKJ9dkNjtIWJeuY2Qoi8KD7oKzURqYRK96t"
-bot_id = "7394662760858599465"
+# personal_access_token = "pat_O7P0vcg1Bw1Zb0MpPyYbleeInHnmgoKJ9dkNjtIWJeuY2Qoi8KD7oKzURqYRK96t"
+personal_access_token = "pat_3o3jUrPKhdvDTFbgi3rm4zW0dMvWRX5cFR9Juw1wqLWXwz8Q1HMpUiJmmxJjXFRY"
+bot_id = "7403665899993284648"
+# bot_ids = ["7403553280519323700", "7403665899993284648"]
 
 # 配置 Coze API 接口信息
 api_url = 'https://api.coze.cn/open_api/v2/chat'
@@ -49,12 +87,17 @@ headers = {
     'Accept': '*/*'
 }
 
-data = {
-    'bot_id': bot_id,
-    'user': '123',
-    'query': '今天天气很热',
-    'stream': False
-}
+# 语音合成
+# 填写平台申请的appid, access_token以及cluster
+appid = "6228786254"
+access_token= "6WnF4rwIiS76sOgOHJqyfBFq1j9swTfX"
+cluster = "volcano_tts"
+
+voice_type = "BV009_streaming"
+host = "openspeech.bytedance.com"
+tts_api_url = f"https://{host}/api/v1/tts"
+
+header = {"Authorization": f"Bearer;{access_token}"}
 
 
 def norm_query(params):
@@ -192,30 +235,97 @@ def extract_value(data, key):
     return 'N/A'
 
 
+def fetch_health_data():
+    heart_rate, spo2, temperature, humidity = 60, 70, 25, 60
+    while True:
+        # now = datetime.datetime.utcnow()
+        # body = {
+        #     "device_id": "dv-2101557672-47f8f@0000",
+        #     "module_identifier": "身体状态"
+        # }
+        # response_body = request("POST", now, None, {}, AK, SK, "GetLastDevicePropertyValue", body)
+        # items = response_body.get("Result", {}).get("items", [])
+        #
+        # # 初始化数据
+        # heart_rate = spo2 = temperature = humidity = 'N/A'
+        #
+        # # 提取数据
+        # for item in items:
+        #     value = item.get("value", "")
+        #     if "Heart Rate" in value:
+        #         heart_rate = extract_value(value, "Heart Rate")
+        #         spo2 = extract_value(value, "SPO2")
+        #     if "Temperature" in value:
+        #         temperature = extract_value(value, "Temperature")
+        #         humidity = extract_value(value, "Humidity")
+        #
+        # # 存储到数据库
+        # if heart_rate != 'N/A':
+        #     new_data = HealthData(heart_rate=heart_rate, spo2=spo2, temperature=temperature, humidity=humidity)
+        #     db.session.add(new_data)
+        #     db.session.commit()
+        #
+
+        heart_rate += 1
+        spo2 += 1
+        temperature += 1
+        humidity += 1
+
+        # 发送数据到客户端
+        socketio.emit('update_data', {
+            'heart_rate': float(heart_rate),
+            'spo2': float(spo2),
+            'temperature': float(temperature),
+            'humidity': float(humidity)
+        })
+
+        # 每2秒更新一次
+        socketio.sleep(1)
+
+
 @app.route('/')
 def index():
     now = datetime.datetime.utcnow()
-    body = {
-        "device_id": "dv-2101557672-47f8f@0000",
-        "module_identifier": "身体状态"
-    }
-    response_body = request("POST", now, None, {}, AK, SK, "GetLastDevicePropertyValue", body)
+    body = {"page_index": 1, "page_size": 10}
+    response_body = request("POST", now, None, {}, AK, SK, "ListMediapipeEvent", body)
+    # url = response_body["Result"]["items"][0]["image_url"]
     items = response_body.get("Result", {}).get("items", [])
 
-    # 初始化数据
-    heart_rate = spo2 = temperature = humidity = 'N/A'
-
-    # 提取数据
+    url1, url2 = '', ''
+    count = 0
     for item in items:
-        value = item.get("value", "")
-        if "Heart Rate" in value:
-            heart_rate = extract_value(value, "Heart Rate")
-            spo2 = extract_value(value, "SPO2")
-        if "Temperature" in value:
-            temperature = extract_value(value, "Temperature")
-            humidity = extract_value(value, "Humidity")
+        if count == 2:
+            break
+        if "obj_bboxes" in item:
+            for bbox in item["obj_bboxes"]:
+                if bbox.get("label") == "down":
+                    url1 = item["image_url"]
+                    count += 1
+                    print(url1)
+                if bbox.get("label") == "fighting":
+                    url2 = item["image_url"]
+                    count += 1
+                    print(url2)
 
-    return render_template('index.html', heart_rate=heart_rate, spo2=spo2, temperature=temperature, humidity=humidity)
+    return render_template('index.html', url1=url1, url2=url2)
+
+
+@socketio.on('connect')
+def handle_connect():
+    socketio.start_background_task(fetch_health_data)
+
+
+@app.route('/data1')
+def get_data():
+    health_data = HealthData.query.order_by(HealthData.timestamp).limit(10).all()
+    data_list = [{
+        'heart_rate': d.heart_rate,
+        'spo2': d.spo2,
+        'temperature': d.temperature,
+        'humidity': d.humidity,
+        'timestamp': d.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    } for d in health_data]
+    return jsonify(data_list)
 
 
 @app.route('/start-recording', methods=['POST'])
@@ -235,18 +345,72 @@ def start_recording():
 
 @app.route('/chat', methods=['POST'])
 def chat():
+    query = test_one()
+    data = {
+        'bot_id': bot_id,
+        'user': '123',
+        'query': query,
+        'stream': False
+    }
     # 发起对话请求
     response = requests.post(api_url, headers=headers, json=data)
     # 检查响应状态码
     if response.status_code == 200:
         # 解析响应内容
         response_data = response.json()
-        query = data['query']
-        reply = response_data['messages'][0]['content']
-        return jsonify({'query': query, 'reply': reply})
+        reply = ''
+        for message in response_data['messages']:
+            if message['type'] == 'answer':
+                reply = message['content']
+                print(reply)
+                break
+        request_json = {
+            "app": {
+                "appid": appid,
+                "token": "access_token",
+                "cluster": cluster
+            },
+            "user": {
+                "uid": "388808087185088"
+            },
+            "audio": {
+                "voice_type": voice_type,
+                "encoding": "mp3",
+                "speed_ratio": 1.0,
+                "volume_ratio": 1.0,
+                "pitch_ratio": 1.0,
+            },
+            "request": {
+                "reqid": str(uuid.uuid4()),
+                "text": reply,
+                "text_type": "plain",
+                "operation": "query",
+                "with_frontend": 1,
+                "frontend_type": "unitTson"
+            }
+        }
+        try:
+            resp = requests.post(tts_api_url, json.dumps(request_json), headers=header)
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            tts_path = f"./static/audio/{timestamp}.mp3"
+            # print(f"resp body: \n{resp.json()}")
+            if "data" in resp.json():
+                data = resp.json()["data"]
+                file_to_save = open(tts_path, "wb")
+                file_to_save.write(base64.b64decode(data))
+        except Exception as e:
+            e.with_traceback()
+
+        return jsonify({'query': query, 'reply': reply, 'tts_path': tts_path})
     else:
         print("Failed to connect to API:", response.status_code)
 
 
+@app.route('/static/audio/<filename>')
+def send_audio(filename):
+    return send_from_directory('static/audio', filename)
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    # app.run(debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

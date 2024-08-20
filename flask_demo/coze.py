@@ -1,8 +1,8 @@
 import requests
 import json
 
-# personal_access_token = "pat_3o3jUrPKhdvDTFbgi3rm4zW0dMvWRX5cFR9Juw1wqLWXwz8Q1HMpUiJmmxJjXFRY"
-# bot_id = "7394757063139688488"
+personal_access_token = "pat_3o3jUrPKhdvDTFbgi3rm4zW0dMvWRX5cFR9Juw1wqLWXwz8Q1HMpUiJmmxJjXFRY"
+bot_id = "7403553280519323700"
 
 # 配置 Coze API 接口信息
 api_url = 'https://api.coze.cn/open_api/v2/chat'
@@ -17,7 +17,7 @@ headers = {
 data = {
     'bot_id': bot_id,  # 替换为你的 Bot ID
     'user': '123',
-    'query': '你可以给我一些饮食上的建议吗？',
+    'query': '今天的天气怎么样？',
     'stream': False
 }
 
@@ -59,6 +59,16 @@ def coze_chat():
         #     print(f"{message['content']}")
         print("Response from Coze:")
         print(json.dumps(response_data, indent=2, ensure_ascii=False))
+        print('-' * 40)
+        print(response_data)
+        print('-' * 40)
+
+        for message in response_data['messages']:
+            if message['type'] == 'answer':
+                print(message['content'])
+                break
+
+        print(response_data['messages'][0]['content'])
     else:
         print("Failed to connect to Coze API:", response.status_code)
 
