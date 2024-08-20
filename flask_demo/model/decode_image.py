@@ -9,5 +9,5 @@ base64_string = base64_string_with_prefix.split(",")[1]
 image_data = base64.b64decode(base64_string)
 
 # 将解码后的数据写入图片文件
-with open("./static/images/decoded_image1.png", "wb") as image_file:
+with open("../static/images/decoded_image1.png", "wb") as image_file:
     image_file.write(image_data)

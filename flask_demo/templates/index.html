@@ -12,9 +12,9 @@
 		gap: 20px;
 	}
 	.images img {
-		width: 400px;
+		width: 370px;
 		height: auto;
-		border: 1px solid #ccc;
+		border: 1px solid #061537;
 	}
 	.visual_chart_text1 {
             position: absolute;
@@ -113,6 +113,45 @@
 	.input-group button:hover {
 		background-color: #0056b3;
 	}
+	#radarChart {
+		width: 100%;
+		height: 100%;
+		margin: 0 auto;
+	}
+
+	.swiper-container {
+		width: 100%;
+		height: 100%;
+	}
+
+	.swiper-slide {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+
+	.visual_box1 {
+		width: 100%;
+		text-align: center;
+		padding: 20px;
+        }
+	.visual_title {
+		font-size: 24px;
+		margin-bottom: 10px;
+	}
+	.visual_chart1 {
+		font-size: 20px;
+		color: lightgreen;
+		line-height: 2;
+	}
+	.suggestion {
+		display: none;
+		animation: fadeIn 2s forwards;
+	}
+	@keyframes fadeIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 新 Bootstrap 核心 CSS 文件 --> 
@@ -131,6 +170,8 @@
 <script src="static/js/china.js"></script>
 <script src="static/js/chartMap.js"></script>
 <link rel="stylesheet" type="text/css" href="static/css/visual.css">
+<!--加载 Socket.IO 客户端库-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
 
 </head>
 <body class="ksh">
@@ -150,69 +191,168 @@
 		<div class="visual_left">
 			<div class="visual_box">
 				<div class="visual_title">
-					<span>血氧变化</span>
-					<img src="static/images/ksh33.png">
-				</div>
-				<div class="visual_chart" id="main1">
-					
-				</div>
-			</div>
-			<div class="visual_box">
-				<div class="visual_title">
 					<span>心率变化</span>
-					<img src="static/images/ksh33.png">
+					<img src="static/images/2.png">
 				</div>
-				<div class="visual_chart" id="main2">
-					
+				<div id="chart25" style="width: 400px; height: 265px;">
+					<canvas id="healthChart"></canvas>
 				</div>
+
+				<script>
+					var chartDom = document.getElementById('chart25');
+					var myChart = echarts.init(chartDom);
+
+					var option = {
+						tooltip: {
+							trigger: 'axis'
+						},
+						legend: {
+							data: ['HeartRate'],
+							textStyle: {
+								color: '#ffffff'
+							}
+						},
+						xAxis: {
+							type: 'category',
+							boundaryGap: false,
+							data: [],
+							axisLabel: {
+								color: '#ffffff'
+							}
+						},
+						yAxis: {
+							type: 'value',
+							axisLabel: {
+								color: '#ffffff'
+							}
+						},
+						series: [
+							{
+								name: 'HeartRate',
+								type: 'line',
+								data: [],
+								itemStyle: {
+									normal: {
+										color: 'rgb(137,189,27)'
+									}
+								}
+							}
+						]
+					};
+
+					myChart.setOption(option);
+
+					var socket = io();
+
+					socket.on('update_data', function(data) {
+						document.getElementById('heart_rate').innerText = data.heart_rate;
+						document.getElementById('spo2').innerText = data.spo2;
+						document.getElementById('temperature').innerText = data.temperature;
+						document.getElementById('humidity').innerText = data.humidity;
+
+						var now = new Date().toLocaleTimeString();
+
+						// 添加新的数据点
+						option.xAxis.data.push(now);
+						option.series[0].data.push(data.heart_rate);
+
+						// 限制显示的数据点数，只显示最近10个数据点
+						if (option.xAxis.data.length > 10) {
+							option.series[0].data.shift();
+							option.xAxis.data.shift();
+						}
+
+						// 更新图表
+						myChart.setOption(option);
+					});
+				</script>
+
 			</div>
+<!--			<div class="visual_box">-->
+<!--				<div class="visual_title">-->
+<!--					<span>天气信息</span>-->
+<!--					<img src="static/images/2.png">-->
+<!--				</div>-->
+<!--				<div class="visual_chart1" id="main26">-->
+
+<!--				</div>-->
+<!--&lt;!&ndash;				<div class="images">&ndash;&gt;-->
+<!--&lt;!&ndash;					<img src="static/images/wea1.png" alt="Image 1">&ndash;&gt;-->
+<!--&lt;!&ndash;				</div>&ndash;&gt;-->
+
+<!--			</div>-->
+
 			<div class="visual_box">
 				<div class="visual_title">
 					<span>温湿度建议</span>
-					<img src="static/images/ksh33.png">
+					<img src="static/images/2.png">
 				</div>
-				<div class="visual_chart sfzcll">
+				<div class="visual_chart1" id="main27">
+
 				</div>
 			</div>
+
+			<script>
+				document.addEventListener("DOMContentLoaded", function() {
+					var suggestions = [
+						"==================",
+						"🌡 适宜温度: 26℃ - 28℃",
+                		"💧 适宜湿度: 50% - 70%",
+                		"👀 建议理由: 夏季较为炎热潮湿，这个温度范围能让您感觉较为舒适，避免过热引起不适。湿度在 50% - 70%之间，既能保持一定的湿润度，又不会过于潮湿，有助于减少闷热感。",
+                		"=================="
+					];
+					var main2Div = document.getElementById("main27");
+					var index = 0;
+
+					function showNextSuggestion() {
+						if (index < suggestions.length) {
+							var suggestionParagraph = document.createElement("p");
+							suggestionParagraph.textContent = suggestions[index];
+							suggestionParagraph.classList.add("suggestion");
+							main2Div.appendChild(suggestionParagraph);
+							suggestionParagraph.style.display = "block";
+							index++;
+							setTimeout(showNextSuggestion, 2000); // 每3秒显示一个新建议
+						}
+					}
+
+					showNextSuggestion();
+				});
+			</script>
+
 		</div>
 		<div class="visual_con">
 			<div class="visual_conTop">
 				<div class="visual_conTop_box visual_conTop1">
 					<div>
 						<h3>血氧指数 %</h3>
-						<p>{{ spo2 }}</p>
+						<p id="spo2">N/A</p>
 						<div class="conTop_smil">
-<!--							<a class="sz">增长:<span>+3%</span><i class="fa fa-long-arrow-up"></i></a>-->
-<!--							<a class="xd">减少:<span>-2%</span><i class="fa fa-long-arrow-down"></i></a>-->
 						</div>
 					</div>
 				</div>
 				<div class="visual_conTop_box visual_conTop2">
 					<div>
 						<h3>心率 bpm</h3>
-						<p id="heart-rate">{{ heart_rate }}</p>
+						<p id="heart_rate">N/A</p>
 						<div class="conTop_smil">
 						</div>
 						<!-- 警告音频 -->
-						<audio id="warning-audio" src="static/audio/warning.mp3"></audio>
+<!--						<audio id="warning-audio" src="static/audio/warning.mp3"></audio>-->
 					</div>
 				</div>
 				<div class="visual_conTop_box visual_conTop1">
 					<div>
 						<h3>当前温度 *C</h3>
-						<p>{{ temperature }}</p>
-<!--						<p>22</p>-->
+						<p id="temperature">N/A</p>
 						<div class="conTop_smil">
-<!--							<a class="sz">日环比:<span>+3%</span><i class="fa fa-long-arrow-up"></i></a>-->
-<!--							<a class="xd">周环比:<span>-2%</span><i class="fa fa-long-arrow-down"></i></a>-->
 						</div>
 					</div>
 				</div>
 				<div class="visual_conTop_box visual_conTop2">
 					<div>
 						<h3>当前湿度 %</h3>
-<!--						<p>71</p>-->
-						<p>{{ humidity }}</p>
+						<p id="humidity">N/A</p>
 						<div class="conTop_smil">
 							<a class="null">null</a>
 <!--							<a class="xd"><span>-2%</span><i class="fa fa-long-arrow-down"></i></a>-->
@@ -221,6 +361,7 @@
 				</div>
 				<div class="clear"></div>
 			</div>
+
 			<div class="visual_conBot">
 				<div class="visual_chart_text2">
 					<div class="chat-box" id="chat-box">
@@ -240,24 +381,106 @@
 		<div class="visual_right">
 			<div class="visual_box">
 				<div class="visual_title">
-					<span>本周发生事件</span>
-					<img src="static/images/ksh33.png">
+					<span>老人意外事件统计</span>
+					<img src="static/images/2.png">
 				</div>
 				<div class="swiper-container visual_swiper1 visual_chart">
 					<div class="swiper-wrapper">
 						<div class="swiper-slide"  id="main3"></div>
 						<div class="swiper-slide"  id="main31"></div>
+<!--							<div id="radarChart" style="width: 600px; height: 400px;"></div>-->
 					</div>
 				</div>
+				<script>
+					// Example data
+					var radarData = {
+						indicator: [
+							{ name: '摔倒', max: 100 },
+							{ name: '突发疾病', max: 100 },
+							{ name: '迷路', max: 100 },
+							{ name: '情绪异常', max: 100 },
+							{ name: '其他', max: 100 }
+						],
+						data: [
+							{
+								value: [80, 70, 85, 90, 75],
+								name: '意外事件统计'
+							}
+						]
+					};
+
+					function initRadarChart() {
+						var radarChart = echarts.init(document.getElementById('radarChart'));
+						var option = {
+							tooltip: {},
+							legend: {
+								data: ['意外事件统计'],
+								textStyle: {
+									color: '#ffffff'
+								}
+							},
+							radar: {
+								indicator: radarData.indicator,
+								shape: 'circle',
+								splitLine: {
+									lineStyle: {
+										color: 'rgba(255, 255, 255, 0.5)'
+									}
+								},
+								splitArea: {
+									areaStyle: {
+										color: ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.1)']
+									}
+								},
+								axisLine: {
+									lineStyle: {
+										color: 'rgba(255, 255, 255, 0.5)'
+									}
+								}
+							},
+							series: [{
+								name: '意外事件统计',
+								type: 'radar',
+								data: radarData.data,
+								itemStyle: {
+									color: '#ff6347'
+								},
+								lineStyle: {
+									color: '#ff6347'
+								},
+								areaStyle: {
+									color: 'rgba(255, 99, 71, 0.5)'
+								}
+							}],
+							backgroundColor: '#00008b'
+						};
+						radarChart.setOption(option);
+					}
+					window.onload = function() {
+<!--						fetchData()-->
+<!--						initRadarChart();-->
+					var myChart3 = echarts.init(document.getElementById('main3'));
+					myChart3.setOption(option3);
+					var myChart31 = echarts.init(document.getElementById('main31'));
+					myChart31.setOption(option31);
+					var mySwiper1 = new Swiper('.visual_swiper1', {
+						autoplay: true,//可选选项，自动滑动
+						speed:800,//可选选项，滑动速度
+						autoplay: {
+							delay: 500000,//1秒切换一次
+						  },
+					})
+					};
+				</script>
 			</div>
 			<div class="visual_box">
 				<div class="visual_title">
 					<span>摄像头</span>
-					<img src="static/images/ksh33.png">
+					<img src="static/images/2.png">
 				</div>
 				<div class="images">
-					<img src="static/images/decoded_image.png" alt="Image 1">
-					<img src="static/images/fighting.jpg" alt="Image 2">
+					<img id="down" alt="Image3" src="{{ url1 }}">
+					<img id="fight" alt="Image4" src="{{ url2 }}">
 				</div>
 			</div>
 		</div>
@@ -265,9 +488,9 @@
 	</div>
 
 	<script>
-		document.addEventListener('DOMContentLoaded', function() {
-				checkHeartRate();
-		});
+<!--		document.addEventListener('DOMContentLoaded', function() {-->
+<!--				checkHeartRate();-->
+<!--		});-->
 
 		function startRecording() {
 			fetch('/start-recording', {
@@ -284,16 +507,16 @@
 			});
 		}
 
-		 function checkHeartRate() {
-			const heartRateElement = document.getElementById('heart-rate');
-			const heartRate = parseInt(heartRateElement.textContent);
-			if (heartRate > 100) { // 100为心率阈值
-				alert('警告：心率过高！');
-				const audio = document.getElementById('warning-audio');
-				audio.load();
-				audio.play();
-			}
-		}
+<!--		 function checkHeartRate() {-->
+<!--			const heartRateElement = document.getElementById('heart-rate');-->
+<!--			const heartRate = parseInt(heartRateElement.textContent);-->
+<!--			if (heartRate > 100) { // 100为心率阈值-->
+<!--				alert('警告：心率过高！');-->
+<!--				const audio = document.getElementById('warning-audio');-->
+<!--				audio.load();-->
+<!--				audio.play();-->
+<!--			}-->
+<!--		}-->
 
 		function appendMessage(content, className) {
             const message = document.createElement('div');
@@ -320,9 +543,10 @@
                 appendMessage(data.query, 'user');
 				setTimeout(() => {
 					appendMessage(data.reply, 'ai');
-					const audio = new Audio(data.audio_url);
+					tts_path = data.tts_path
+					const audio = new Audio(tts_path);
                     audio.play();
-				}, 5000); // 延迟 5 秒
+				}, 100); // 延迟 1 秒
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -356,47 +580,6 @@
     		,1100);
 		})
 
-	//血氧变化
-	var myChart1 = echarts.init(document.getElementById('main1'));
-    myChart1.setOption(option1);
-	//心率变化
-	var myChart2 = echarts.init(document.getElementById('main2'));
-    myChart2.setOption(option2);
-    //本周发生事件
-	var myChart3 = echarts.init(document.getElementById('main3'));
-    myChart3.setOption(option3);
-    var myChart31 = echarts.init(document.getElementById('main31'));
-    myChart31.setOption(option31);
-    var mySwiper1 = new Swiper('.visual_swiper1', {
-		autoplay: true,//可选选项，自动滑动
-		speed:800,//可选选项，滑动速度
-		autoplay: {
-		    delay: 5000,//1秒切换一次
-		  },
-	})
-
-	var myChart4 = echarts.init(document.getElementById('main4'));
-    myChart4.setOption(option4);
-    var myChart41 = echarts.init(document.getElementById('main41'));
-    myChart41.setOption(option41);
-    var mySwiper2 = new Swiper('.visual_swiper2', {
-		autoplay: true,//可选选项，自动滑动
-		direction : 'vertical',//可选选项，滑动方向
-		speed:2000,//可选选项，滑动速度
-	})
-
-	var myChart5 = echarts.init(document.getElementById('main5'));
-    myChart5.setOption(option5);
-    var myChart6 = echarts.init(document.getElementById('main6'));
-    myChart6.setOption(option6);
-    var myChart7 = echarts.init(document.getElementById('main7'));
-    myChart7.setOption(option7);
-
-	var myChart8 = echarts.init(document.getElementById('main8'));
-    myChart8.setOption(option8);
-
-	var myChart9 = echarts.init(document.getElementById('main9'));
-    myChart9.setOption(option9);
 	</script>
 </body>
 </html>

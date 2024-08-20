@@ -7,15 +7,16 @@ var data = {
     xAxis: ['14', '15', '16', '17', '18',
         '19'
     ],
+
     yAxis: [
         [8, 10, 10, 11, 9, 13]
+        //{{ chart_data['spo2']|tojson}}
     ],
     lines: [
         [10, 10, 9, 11, 7, 8]
     ],
     barColor: ['#009883', '#e66922'], //柱子颜色 必填参数
     lineColor: ['#fd6665', '#fba73b'], // 折线颜色
-
 }
 
 var myData = (function test() {
@@ -331,6 +332,8 @@ option2 = {
                 color: 'rgb(137,189,27)'
             }
         },
+        //data: {{ chart_data['heart_rate']|tojson|safe }}
+        //data: [70, 75, 64, 65, 72, 51, 79]
         data: [70,75,64,65,72,51,79,84,94,72,84,63]
     }, ]
 };
@@ -339,24 +342,24 @@ option2 = {
 //本月发生事件1
 var color = ['#e9df3d', '#f79c19', '#21fcd6', '#08c8ff', '#df4131'];
 var data = [{
-        "name": "晕倒",
-        "value": 30
+        "name": "摔倒",
+        "value": 3
     },
     {
-        "name": "血氧过高",
-        "value": 30
+        "name": "突发疾病",
+        "value": 2
     },
     {
         "name": "血氧过低",
-        "value": 42
+        "value": 4
     },
     {
-        "name": "情绪异常",
-        "value": 50
+        "name": "心率过高",
+        "value": 5
     },
     {
-        "name": "情绪良好",
-        "value": 34
+        "name": "其他",
+        "value": 1
     }
 ];
 

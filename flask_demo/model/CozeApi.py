@@ -9,7 +9,7 @@ retry_delay = 8  # 两次尝试之间的延迟时间（秒）
 
 
 class CozeApi:
-    def __init__(self, bot_id = '', personal_access_token = ''):
+    def __init__(self, bot_id = '7392086398356013097', personal_access_token = 'pat_AE5wUW0WUwSzzIV3uyneWsBySJXlRzGZwNg2USIUG2AQOpGwpRmVo5VkTe0dQpYZ'):
         self.bot_id = bot_id
 
         self.personal_access_token = personal_access_token
